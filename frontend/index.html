@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareRights AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #201B16;
+    --ink-soft: #4A3F33;
+    --paper: #FBF8F2;
+    --paper-dim: #F1ECE1;
+    --line: #DCD4C2;
+    --medical: #2A9D8F;
+    --medical-dim: #E4F3F1;
+    --rights: #B8860B;
+    --rights-dim: #FBF1DC;
+    --risk: #A6572E;
+    --risk-dim: #F5E6DC;
+    --alert: #B23A48;
+    --alert-dim: #FAE8E9;
+    --good: #2F7A4F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image: radial-gradient(circle at 20% 0%, #332A1D 0%, var(--ink) 55%);
+    color: var(--paper);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 20px 80px; }
+
+  header.hero { text-align: center; margin-bottom: 40px; }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #C2A66B;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: clamp(30px, 5vw, 48px);
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  h1 .divider { color: #8A7A63; font-weight: 400; padding: 0 6px; }
+  .subhead {
+    color: #C7BCAA;
+    font-size: 15.5px;
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.55;
+  }
+
+  .card {
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 32px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5);
+  }
+
+  label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  textarea, input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 13px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    border: 1.5px solid var(--line);
+    border-radius: 3px;
+    background: #FFFFFF;
+    color: var(--ink);
+  }
+  textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+  textarea:focus, input:focus { outline: 2px solid var(--medical); outline-offset: 1px; border-color: var(--medical); }
+
+  .examples { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .example-chip {
+    font-size: 12.5px;
+    padding: 7px 12px;
+    background: var(--paper-dim);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-family: 'Inter', sans-serif;
+  }
+  .example-chip:hover { background: #E9E1CE; }
+
+  button.primary {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 13px 26px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+    width: 100%;
+  }
+  button.primary:hover:not(:disabled) { background: #3A3024; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status-line {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    display: block;
+    margin-top: 10px;
+  }
+
+  .disclaimer {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 12.5px;
+    color: #A8987F;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  .safety-block {
+    background: var(--alert-dim);
+    border: 1.5px solid var(--alert);
+    border-radius: 4px;
+    padding: 28px 32px;
+    color: var(--ink);
+  }
+  .safety-block h2 {
+    font-family: 'Fraunces', serif;
+    color: var(--alert);
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+  .safety-block p { margin: 0; line-height: 1.6; font-size: 15px; }
+
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 4px;
+  }
+  @media (max-width: 760px) { .agent-grid { grid-template-columns: 1fr; } }
+
+  .agent-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 22px;
+    border-top: 4px solid transparent;
+  }
+  .agent-card.medical { border-color: var(--medical); }
+  .agent-card.rights { border-color: var(--rights); }
+  .agent-card.risk { border-color: var(--risk); }
+  .agent-card.prioritized {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,0.35);
+    order: -1;
+  }
+  .priority-pin {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+
+  .priority-row {
+    background: rgba(251,248,242,0.06);
+    border: 1px solid rgba(199,188,170,0.3);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .priority-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: #C7BCAA;
+  }
+  .priority-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .priority-btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 13px;
+    background: rgba(251,248,242,0.08);
+    color: var(--paper);
+    border: 1px solid rgba(199,188,170,0.35);
+    border-radius: 20px;
+    cursor: pointer;
+  }
+  .priority-btn:hover { background: rgba(251,248,242,0.15); }
+  .priority-btn.active { background: var(--medical); border-color: var(--medical); color: #06231F; }
+
+  .agent-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .medical .dot { background: var(--medical); }
+  .rights .dot { background: var(--rights); }
+  .risk .dot { background: var(--risk); }
+  .medical .agent-label { color: #1A6E63; }
+  .rights .agent-label { color: #8C6608; }
+  .risk .agent-label { color: #7A3A1E; }
+
+  .agent-finding {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  .agent-reasoning {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin-bottom: 16px;
+  }
+  .confidence-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+  .conf-strong { background: #E1F0E5; color: var(--good); }
+  .conf-moderate { background: #FBF1DC; color: #8C6608; }
+  .conf-gray { background: #F1ECE1; color: var(--ink-soft); }
+
+  .debate-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 28px 32px;
+    margin-top: 14px;
+  }
+  .debate-card h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  .agree-tag, .conflict-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .agree-tag { background: #E1F0E5; color: var(--good); }
+  .conflict-tag { background: var(--alert-dim); color: var(--alert); }
+  .debate-text { font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+
+  .loading-state {
+    text-align: center;
+    padding: 50px 0 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: #C7BCAA;
+  }
+  .loading-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--medical);
+    border-radius: 50%;
+    margin: 0 3px;
+    animation: pulse 1.2s infinite ease-in-out;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--rights); }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--risk); }
+  @keyframes pulse { 0%,80%,100% { opacity: 0.25; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .loading-dots span { animation: none; } }
+
+  .error-box {
+    margin-top: 20px;
+    background: var(--alert-dim);
+    border: 1px solid var(--alert);
+    color: var(--ink);
+    padding: 16px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  /* ---- login screen ---- */
+  #loginView { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; }
+  .login-shell { width: 100%; max-width: 420px; }
+  .login-shell header { margin-bottom: 32px; }
+  .login-card { background: var(--paper); color: var(--ink); border-radius: 4px; padding: 36px 32px; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5); }
+  .field { margin-bottom: 18px; }
+  .toggle-row { display: flex; background: var(--paper-dim); border-radius: 3px; padding: 4px; margin-bottom: 26px; }
+  .toggle-btn { flex: 1; text-align: center; padding: 9px 0; font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); background: transparent; border: none; border-radius: 3px; cursor: pointer; }
+  .toggle-btn.active { background: var(--ink); color: var(--paper); }
+  .login-note { text-align: center; margin-top: 18px; font-size: 12.5px; color: var(--ink-soft); }
+  .login-error { color: var(--alert); font-size: 12.5px; margin-top: -8px; margin-bottom: 14px; display: none; }
+
+  /* ---- app shell / topbar ---- */
+  #appShell { display: none; }
+  .topbar {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .brand-mini { font-family: 'Fraunces', serif; font-size: 18px; color: var(--paper); }
+  .brand-mini .divider { color: #8A7A63; }
+  .topbar-right { display: flex; align-items: center; gap: 22px; }
+  .nav-links { display: flex; gap: 22px; }
+  .nav-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #C7BCAA;
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 6px 2px;
+    border-bottom: 2px solid transparent;
+  }
+  .nav-link:hover { color: var(--paper); }
+  .nav-link.active { color: var(--paper); border-bottom-color: var(--medical); }
+  .user-chip { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #C7BCAA; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+  .user-chip:hover { color: var(--paper); }
+  .user-chip-btn { background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+  .user-chip-btn:hover { color: var(--paper); }
+  .logout-link, .back-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: #C7BCAA;
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .back-link { color: var(--ink-soft); text-decoration: none; font-weight: 600; }
+  .back-link:before { content: "← "; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---- dashboard ---- */
+  .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 14px; }
+  .dash-header h1 { font-size: 30px; margin: 0 0 6px; }
+  .dash-header p { color: #C7BCAA; margin: 0; font-size: 14.5px; }
+  .new-case-btn {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 20px;
+    background: var(--medical);
+    color: #06231F;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .new-case-btn:hover { background: #34B3A3; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .stat-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 16px 18px;
+    border-top: 3px solid var(--line);
+  }
+  .stat-card.stat-total { border-color: var(--medical); }
+  .stat-card.stat-agreed { border-color: var(--good); }
+  .stat-card.stat-conflict { border-color: var(--rights); }
+  .stat-card.stat-safety { border-color: var(--alert); }
+  .stat-number {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+
+  .insight-card {
+    background: var(--medical-dim);
+    border: 1px solid var(--medical);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin: 14px 0 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .insight-icon { font-size: 18px; line-height: 1.4; }
+  .insight-text { font-size: 13.5px; color: var(--ink); line-height: 1.5; }
+  .insight-text strong { color: #1A6E63; }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .feature-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 22px;
+  }
+  .feature-icon { font-size: 24px; margin-bottom: 10px; }
+  .feature-card h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+  .feature-card p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  .about-section {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 26px 28px;
+    margin-bottom: 14px;
+  }
+  .about-section h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 10px;
+  }
+  .about-section p {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  .history-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #C2A66B;
+    margin: 30px 0 14px;
+  }
+  .history-empty {
+    background: rgba(251,248,242,0.06);
+    border: 1px dashed rgba(199,188,170,0.35);
+    border-radius: 4px;
+    padding: 30px;
+    text-align: center;
+    color: #C7BCAA;
+    font-size: 14px;
+  }
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .history-item {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    border-left: 4px solid var(--line);
+    transition: transform 0.1s;
+  }
+  .history-item:hover { transform: translateX(2px); }
+  .history-item.tag-agree { border-color: var(--good); }
+  .history-item.tag-conflict { border-color: var(--rights); }
+  .history-item.tag-safety { border-color: var(--alert); }
+  .history-text { flex: 1; min-width: 0; }
+  .history-snippet { color: var(--ink); font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+  .history-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .status-agree { background: #E1F0E5; color: var(--good); }
+  .status-conflict { background: var(--rights-dim); color: #8C6608; }
+  .status-safety { background: var(--alert-dim); color: var(--alert); }
+
+  /* ---- results page context ---- */
+  .case-context {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: #C7BCAA;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+  .case-context span { color: var(--paper); }
+  .case-context span.case-type-badge { color: #8C6608 !important; }
+
+  .case-type-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--rights-dim);
+    color: #8C6608;
+    margin-bottom: 6px;
+  }
+
+  .results-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .toolbar-btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    background: rgba(251,248,242,0.08);
+    color: var(--paper);
+    border: 1px solid rgba(199,188,170,0.35);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .toolbar-btn:hover { background: rgba(251,248,242,0.15); }
+
+  .feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .feedback-label { font-size: 11.5px; color: var(--ink-soft); margin-right: 4px; }
+  .feedback-btn {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .feedback-btn:hover { background: var(--paper-dim); }
+  .feedback-btn.selected-up { background: #E1F0E5; border-color: var(--good); color: var(--good); }
+  .feedback-btn.selected-down { background: var(--alert-dim); border-color: var(--alert); color: var(--alert); }
+  .feedback-sent { font-size: 11.5px; color: var(--good); margin-left: 4px; }
+
+  .letter-card {
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 32px;
+    border: 1px solid var(--line);
+  }
+  .letter-card h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    margin: 0 0 16px;
+    color: var(--ink);
+  }
+  .letter-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    white-space: pre-wrap;
+    background: var(--paper-dim);
+    padding: 20px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+  .letter-note {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+  }
+
+  @media print {
+    body { background: white !important; color: black !important; }
+    .topbar, .no-print, .results-toolbar, .back-link, .feedback-row { display: none !important; }
+    .agent-card, .debate-card, .safety-block, .letter-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+    .case-context, .case-context span { color: black !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginView">
+  <div class="login-shell">
+    <header>
+      <div class="eyebrow">Multi-Agent Health &amp; Insurance Rights Reasoning</div>
+      <h1>CareRights<span class="divider">/</span>AI</h1>
+      <p class="subhead">Sign in to describe your case and see what the agents find.</p>
+    </header>
+    <div class="login-card">
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="tabLogin">Log in</button>
+        <button class="toggle-btn" id="tabSignup">Sign up</button>
+      </div>
+      <div class="field" id="nameField" style="display:none;">
+        <label for="nameInput">Name</label>
+        <input type="text" id="nameInput" placeholder="Smitha J">
+      </div>
+      <div class="field">
+        <label for="emailInput">Email</label>
+        <input type="email" id="emailInput" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="passInput">Password</label>
+        <input type="password" id="passInput" placeholder="••••••••">
+      </div>
+      <div class="login-error" id="loginError">Please fill in all fields.</div>
+      <button class="primary" id="authBtn">Log in</button>
+      <p class="login-note">Your case details stay private to your account.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="appShell">
+  <div class="topbar">
+    <span class="brand-mini">CareRights<span class="divider">/</span>AI</span>
+    <div class="topbar-right">
+      <nav class="nav-links">
+        <button class="nav-link" id="navDashboard">Dashboard</button>
+        <button class="nav-link" id="navNewCase">New case</button>
+        <button class="nav-link" id="navHistory">History</button>
+        <button class="nav-link" id="navFeatures">Features</button>
+        <button class="nav-link" id="navAbout">About</button>
+      </nav>
+      <button class="user-chip user-chip-btn" id="userChip"></button>
+      <button class="logout-link" id="logoutBtn">Log out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ---- DASHBOARD ---- -->
+    <div class="view" id="dashboardView">
+      <header class="hero" style="text-align:left; margin-bottom: 30px;">
+        <div class="eyebrow">Dashboard</div>
+        <h1 style="font-size:34px;">Welcome back<span id="welcomeName"></span></h1>
+        <p class="subhead" style="margin:0;">Start a new case, or check what your past cases found.</p>
+      </header>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:36px;">
+        <button class="new-case-btn" id="gotoNewCaseBtn">+ New case</button>
+        <button class="new-case-btn" id="gotoHistoryBtn" style="background:var(--paper); color:var(--ink);">View history</button>
+      </div>
+      <div id="statsRow" class="stats-row"></div>
+      <div id="patternInsights" style="display:none;"></div>
+      <div class="history-section-label">Recent cases</div>
+      <div id="dashHistoryEmpty" class="history-empty">No cases yet &mdash; start your first one above.</div>
+      <div id="dashHistoryList" class="history-list"></div>
+    </div>
+
+    <!-- ---- HISTORY ---- -->
+    <div class="view" id="historyView">
+      <header class="hero" style="text-align:left; margin-bottom: 30px;">
+        <div class="eyebrow">History</div>
+        <h1 style="font-size:34px;">Your cases</h1>
+        <p class="subhead" style="margin:0;">Everything you've analyzed this session. Click one to reopen it.</p>
+      </header>
+      <div id="historyEmpty" class="history-empty">No cases yet &mdash; start your first one from the Dashboard or New Case tab.</div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+
+    <!-- ---- FEATURES ---- -->
+    <div class="view" id="featuresView">
+      <header class="hero" style="text-align:left; margin-bottom: 30px;">
+        <div class="eyebrow">Features</div>
+        <h1 style="font-size:34px;">Everything CareRights AI does</h1>
+        <p class="subhead" style="margin:0;">Beyond the core analysis, here's what's built in.</p>
+      </header>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#129504;</div>
+          <h3>Three Reasoning Agents</h3>
+          <p>Medical Evidence, Cost/Insurance Rights, and Risk-of-Waiting agents each independently analyze your case, grounded in real retrieved sources — not general knowledge.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128269;</div>
+          <h3>Second Opinion</h3>
+          <p>A dedicated agent actively challenges the Medical agent's finding, the way a real second medical opinion would — not just a rubber stamp.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9878;&#65039;</div>
+          <h3>Transparent Disagreement</h3>
+          <p>When agents disagree, you see it — with a plain-language explanation of why, instead of one flattened answer hiding the conflict.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9888;&#65039;</div>
+          <h3>Safety Stop-Gate</h3>
+          <p>High-risk or emergency cases get a hard block, directing you to real help immediately instead of routine AI output.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#127760;</div>
+          <h3>5-Language Support</h3>
+          <p>Get your results in English, Hindi, Tamil, Telugu, or Malayalam — the agents respond directly in your chosen language.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128220;</div>
+          <h3>Appeal Letter Generator</h3>
+          <p>Turn your case findings into a ready-to-send appeal letter, citing the exact medical and insurance sources found — on request, one click.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128266;</div>
+          <h3>Text-to-Speech</h3>
+          <p>Have your results read aloud in your chosen language — helpful if reading is difficult or you're on the move.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128190;</div>
+          <h3>PDF Export</h3>
+          <p>Save or print a clean copy of your case results and appeal letter to share with your doctor or insurer.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128197;</div>
+          <h3>Deadline Reminders</h3>
+          <p>Download a calendar reminder for your follow-up, so an appeal window doesn't quietly pass you by.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128203;</div>
+          <h3>Case-Type Detection</h3>
+          <p>Every case is automatically tagged — Insurance Denial, Treatment Necessity, Delay/Prior Authorization, Urgent/Emergency, or General Inquiry.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128202;</div>
+          <h3>Your Case History &amp; Patterns</h3>
+          <p>Every case is saved to your account, with stats and pattern insights showing what kinds of cases you've faced and how often your agents agree.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128077;</div>
+          <h3>Feedback on Every Finding</h3>
+          <p>Rate each agent's answer with a quick thumbs up or down, helping track which findings are actually useful.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- ABOUT ---- -->
+    <div class="view" id="aboutView">
+      <header class="hero" style="text-align:left; margin-bottom: 30px;">
+        <div class="eyebrow">About</div>
+        <h1 style="font-size:34px;">How CareRights AI works</h1>
+        <p class="subhead" style="margin:0;">The problem it solves, and how it stays honest.</p>
+      </header>
+
+      <div class="about-section">
+        <h2>The problem</h2>
+        <p>A lot of health decisions come with a hidden legal or financial question attached — an insurance denial, a delayed treatment, a doctor saying a procedure is needed while the insurer says it isn't. Today, resolving this means separately consulting a doctor and a lawyer or insurance expert — slow, expensive, and often abandoned. Insurers already have automatic claim-processing systems, but those work for the insurer's speed, not the patient's fairness. CareRights AI works on the patient's side of that gap — before filing, to strengthen a case, and after a denial, to fight back with real rights information.</p>
+      </div>
+
+      <div class="about-section">
+        <h2>How it stays grounded, not guessing</h2>
+        <p>Every agent retrieves real source documents before answering — real medical guidelines, real insurance regulations — through a technique called retrieval-augmented generation (RAG). If the available sources don't clearly cover your situation, the agent says so honestly instead of inventing an answer. You can see exactly which source chunk supported each finding.</p>
+      </div>
+
+      <div class="about-section">
+        <h2>Why three agents, not one</h2>
+        <p>Medical necessity, insurance entitlement, and urgency are three different kinds of questions. Keeping them as separate agents — instead of blending them into one answer — means you see exactly where they agree and where they clash, which is often the most useful information in a real dispute.</p>
+      </div>
+
+      <div class="about-section">
+        <h2>What this is not</h2>
+        <p>CareRights AI does not diagnose medical conditions and does not give a legal ruling. It organizes real evidence and shows you what to ask your doctor or insurer next. For anything urgent or high-risk, it explicitly stops and tells you to seek real help immediately.</p>
+      </div>
+    </div>
+
+    <!-- ---- PROFILE ---- -->
+    <div class="view" id="profileView">
+      <button class="back-link" id="backToDashFromProfile" style="margin-bottom:20px;">Dashboard</button>
+      <header class="hero" style="text-align:left; margin-bottom: 30px;">
+        <div class="eyebrow">Profile</div>
+        <h1 style="font-size:34px;">Your account</h1>
+      </header>
+
+      <div class="about-section" id="profileInfoCard">
+        <h2>Account details</h2>
+        <p id="profileDetails">Loading&hellip;</p>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <label style="margin-bottom:16px; font-size:14px; text-transform:none; letter-spacing:normal; font-family:'Fraunces',serif; color:var(--ink); font-weight:500;">Change password</label>
+        <div class="field">
+          <label for="currentPasswordInput">Current password</label>
+          <input type="password" id="currentPasswordInput" placeholder="••••••••">
+        </div>
+        <div class="field">
+          <label for="newPasswordInput">New password</label>
+          <input type="password" id="newPasswordInput" placeholder="At least 8 characters">
+        </div>
+        <div class="login-error" id="passwordChangeError"></div>
+        <div id="passwordChangeSuccess" style="display:none; color:var(--good); font-size:13px; margin-bottom:14px;">Password updated successfully.</div>
+        <button class="primary" id="changePasswordBtn">Update password</button>
+      </div>
+    </div>
+
+    <!-- ---- NEW CASE ---- -->
+    <div class="view" id="newCaseView">
+      <button class="back-link" id="backToDashFromNew" style="margin-bottom:20px;">Dashboard</button>
+      <header class="hero">
+        <div class="eyebrow">New case</div>
+        <h1>Describe your situation</h1>
+        <p class="subhead">Three agents check medical necessity, insurance rights, and the risk of waiting &mdash; then show you where they agree or clash.</p>
+      </header>
+      <div class="card">
+        <label for="caseInput">What's going on?</label>
+        <textarea id="caseInput" placeholder="e.g. My insurer denied coverage for a knee replacement my doctor recommended after physiotherapy failed..."></textarea>
+        <div class="examples">
+          <span class="example-chip" data-ex="My insurance company denied coverage for a knee replacement surgery that my orthopedic doctor recommended after six months of physiotherapy did not help.">Knee replacement denial</span>
+          <span class="example-chip" data-ex="My doctor wants me to get an MRI for persistent headaches, but my insurer says it's not medically necessary and wants me to try cheaper options first.">MRI necessity dispute</span>
+          <span class="example-chip" data-ex="I am having severe chest pain and shortness of breath, and my insurer is asking for prior authorization before covering an ER visit.">Urgent chest pain case</span>
+        </div>
+        <div style="margin-top:20px;">
+          <label for="languageSelect">Answer in</label>
+          <select id="languageSelect" style="width:auto; min-width:180px; padding:10px 14px; font-family:'Inter',sans-serif; font-size:14px; border:1.5px solid var(--line); border-radius:3px; background:#FFFFFF; color:var(--ink);">
+            <option value="English">English</option>
+            <option value="Hindi">हिन्दी (Hindi)</option>
+            <option value="Tamil">தமிழ் (Tamil)</option>
+            <option value="Telugu">తెలుగు (Telugu)</option>
+            <option value="Malayalam">മലയാളം (Malayalam)</option>
+          </select>
+        </div>
+        <button class="primary" id="submitBtn" style="margin-top:22px;">Analyze case</button>
+        <span class="status-line" id="statusLine"></span>
+      </div>
+      <p class="disclaimer">CareRights AI is not medical or legal advice. Agents retrieve answers from a curated document corpus via retrieval-augmented generation, and every finding is grounded in a cited source. For serious or urgent situations, always consult a real doctor or legal professional.</p>
+    </div>
+
+    <!-- ---- LOADING (own page) ---- -->
+    <div class="view" id="loadingView">
+      <div class="loading-state">
+        Consulting agents<span class="loading-dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>
+
+    <!-- ---- RESULTS ---- -->
+    <div class="view" id="resultsView">
+      <button class="back-link" id="backToDashFromResults" style="margin-bottom:20px;">History</button>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:6px;">
+        <div class="case-context" style="margin-bottom:0;">
+          <span id="resultsCaseTypeBadge" class="case-type-badge"></span><br>
+          Case: <span id="resultsCaseText"></span>
+        </div>
+        <div class="results-toolbar">
+          <button class="toolbar-btn" id="speakBtn" title="Read results aloud">&#128266; Listen</button>
+          <button class="toolbar-btn" id="downloadPdfBtn" title="Save as PDF">&#128190; Save PDF</button>
+          <button class="toolbar-btn" id="addReminderBtn" title="Add appeal deadline to calendar">&#128197; Remind me</button>
+          <button class="toolbar-btn" id="appealLetterBtn" title="Generate a ready-to-send appeal letter">&#128220; Generate Appeal Letter</button>
+        </div>
+      </div>
+      <div id="priorityRow" class="priority-row no-print" style="display:none;">
+        <span class="priority-label">What matters most to you right now?</span>
+        <div class="priority-buttons">
+          <button class="priority-btn" data-priority="medical">&#127973; Medical Evidence</button>
+          <button class="priority-btn" data-priority="rights">&#128176; Cost / Coverage</button>
+          <button class="priority-btn" data-priority="risk">&#9203; Speed</button>
+        </div>
+      </div>
+      <div id="resultsBody"></div>
+      <div id="appealLetterContainer" style="display:none; margin-top:14px;"></div>
+      <div style="margin-top:24px;" class="no-print">
+        <button class="new-case-btn" id="analyzeAnotherBtn">+ Analyze another case</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============ state ============
+// ============ backend connection ============
+// =====================================================================
+// IMPORTANT: When you deploy this online, change the line below to your
+// real backend's URL (e.g. 'https://carerights-api.onrender.com').
+// Right now it points at your own computer only ('127.0.0.1' = "this
+// computer"), which is why only you can use it while testing locally.
+// =====================================================================
+const API_BASE = 'http://127.0.0.1:8000';
+
+let currentUser = null;
+let authToken = null;
+let caseHistory = []; // loaded from server: {id, case_text, result, created_at}
+let activeCaseId = null;
+
+// ============ view switching ============
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+  if (viewId === 'dashboardView') document.getElementById('navDashboard').classList.add('active');
+  if (viewId === 'newCaseView') document.getElementById('navNewCase').classList.add('active');
+  if (viewId === 'historyView') document.getElementById('navHistory').classList.add('active');
+  if (viewId === 'featuresView') document.getElementById('navFeatures').classList.add('active');
+  if (viewId === 'aboutView') document.getElementById('navAbout').classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+// ============ login flow ============
+let isSignup = false;
+const tabLogin = document.getElementById('tabLogin');
+const tabSignup = document.getElementById('tabSignup');
+const nameField = document.getElementById('nameField');
+const authBtn = document.getElementById('authBtn');
+const loginError = document.getElementById('loginError');
+const loginView = document.getElementById('loginView');
+const appShell = document.getElementById('appShell');
+const userChip = document.getElementById('userChip');
+const welcomeName = document.getElementById('welcomeName');
+
+tabLogin.addEventListener('click', () => {
+  isSignup = false;
+  tabLogin.classList.add('active'); tabSignup.classList.remove('active');
+  nameField.style.display = 'none';
+  authBtn.textContent = 'Log in';
+});
+tabSignup.addEventListener('click', () => {
+  isSignup = true;
+  tabSignup.classList.add('active'); tabLogin.classList.remove('active');
+  nameField.style.display = 'block';
+  authBtn.textContent = 'Create account';
+});
+
+authBtn.addEventListener('click', async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const pass = document.getElementById('passInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+  if (!email || !pass || (isSignup && !name)) {
+    loginError.textContent = 'Please fill in all fields.';
+    loginError.style.display = 'block';
+    return;
+  }
+  loginError.style.display = 'none';
+  authBtn.disabled = true;
+  authBtn.textContent = isSignup ? 'Creating account...' : 'Logging in...';
+
+  try {
+    const endpoint = isSignup ? '/api/signup' : '/api/login';
+    const body = isSignup ? { name, email, password: pass } : { email, password: pass };
+    const res = await fetch(API_BASE + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      loginError.textContent = data.detail || 'Something went wrong. Please try again.';
+      loginError.style.display = 'block';
+      return;
+    }
+
+    authToken = data.token;
+    currentUser = data.user;
+    userChip.textContent = 'Signed in as ' + currentUser.name;
+    welcomeName.textContent = ', ' + currentUser.name;
+    loginView.style.display = 'none';
+    appShell.style.display = 'block';
+    caseInput.value = '';
+    statusLine.textContent = '';
+    showView('newCaseView');
+    await loadHistoryFromServer();
+  } catch (err) {
+    loginError.textContent = 'Could not reach the server. Is the backend running on ' + API_BASE + '?';
+    loginError.style.display = 'block';
+  } finally {
+    authBtn.disabled = false;
+    authBtn.textContent = isSignup ? 'Create account' : 'Log in';
+  }
+});
+
+document.getElementById('navDashboard').addEventListener('click', () => showView('dashboardView'));
+document.getElementById('navNewCase').addEventListener('click', () => {
+  caseInput.value = '';
+  statusLine.textContent = '';
+  showView('newCaseView');
+});
+document.getElementById('navHistory').addEventListener('click', () => showView('historyView'));
+document.getElementById('navFeatures').addEventListener('click', () => showView('featuresView'));
+document.getElementById('navAbout').addEventListener('click', () => showView('aboutView'));
+document.getElementById('userChip').addEventListener('click', () => {
+  showView('profileView');
+  loadProfile();
+});
+document.getElementById('backToDashFromProfile').addEventListener('click', () => showView('dashboardView'));
+document.getElementById('gotoHistoryBtn').addEventListener('click', () => showView('historyView'));
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  try {
+    await fetch(API_BASE + '/api/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+  } catch (err) { /* logout locally regardless */ }
+  appShell.style.display = 'none';
+  loginView.style.display = 'flex';
+  document.getElementById('emailInput').value = '';
+  document.getElementById('passInput').value = '';
+  document.getElementById('nameInput').value = '';
+  currentUser = null;
+  authToken = null;
+  caseHistory = [];
+  activeCaseId = null;
+});
+
+// ============ dashboard <-> new case <-> results nav ============
+document.getElementById('gotoNewCaseBtn').addEventListener('click', () => {
+  caseInput.value = '';
+  statusLine.textContent = '';
+  showView('newCaseView');
+});
+document.getElementById('backToDashFromNew').addEventListener('click', () => showView('dashboardView'));
+document.getElementById('backToDashFromResults').addEventListener('click', () => showView('historyView'));
+document.getElementById('analyzeAnotherBtn').addEventListener('click', () => {
+  caseInput.value = '';
+  statusLine.textContent = '';
+  showView('newCaseView');
+});
+
+async function loadHistoryFromServer() {
+  try {
+    const res = await fetch(API_BASE + '/api/cases', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    if (!res.ok) throw new Error('Failed to load history');
+    caseHistory = await res.json(); // [{id, case_text, result, created_at}, ...]
+  } catch (err) {
+    caseHistory = [];
+  }
+  renderHistory();
+}
+
+function renderStats() {
+  const statsEl = document.getElementById('statsRow');
+  if (!statsEl) return;
+  if (caseHistory.length === 0) {
+    statsEl.innerHTML = '';
+    return;
+  }
+  const total = caseHistory.length;
+  const safety = caseHistory.filter(c => c.result.debate.high_risk).length;
+  const agreed = caseHistory.filter(c => !c.result.debate.high_risk && c.result.debate.agreement === 'agree').length;
+  const conflict = caseHistory.filter(c => !c.result.debate.high_risk && c.result.debate.agreement !== 'agree').length;
+
+  statsEl.innerHTML = `
+    <div class="stat-card stat-total"><div class="stat-number">${total}</div><div class="stat-label">Total Cases</div></div>
+    <div class="stat-card stat-agreed"><div class="stat-number">${agreed}</div><div class="stat-label">Agreed</div></div>
+    <div class="stat-card stat-conflict"><div class="stat-number">${conflict}</div><div class="stat-label">Conflicts Found</div></div>
+    <div class="stat-card stat-safety"><div class="stat-number">${safety}</div><div class="stat-label">Safety Stops</div></div>
+  `;
+}
+
+function renderPatternInsights() {
+  const el = document.getElementById('patternInsights');
+  if (!el) return;
+  // Need at least 2 cases for a "pattern" to mean anything
+  if (caseHistory.length < 2) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+
+  // Most common case type
+  const typeCounts = {};
+  caseHistory.forEach(c => {
+    const t = c.result.case_type || 'General Inquiry';
+    typeCounts[t] = (typeCounts[t] || 0) + 1;
+  });
+  const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+  const topTypePct = Math.round((topType[1] / caseHistory.length) * 100);
+
+  // Agreement rate (excluding safety-stopped cases, since those never reach a debate verdict)
+  const nonSafety = caseHistory.filter(c => !c.result.debate.high_risk);
+  let agreementLine = '';
+  if (nonSafety.length > 0) {
+    const agreedCount = nonSafety.filter(c => c.result.debate.agreement === 'agree').length;
+    const agreementPct = Math.round((agreedCount / nonSafety.length) * 100);
+    agreementLine = `Your agents have agreed on <strong>${agreementPct}%</strong> of your cases so far.`;
+  }
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="insight-card">
+      <span class="insight-icon">&#128202;</span>
+      <div>
+        <div class="insight-text">Most of your cases (<strong>${topTypePct}%</strong>) have been <strong>${escapeHtml(topType[0])}</strong>. ${agreementLine}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHistory() {
+  renderStats();
+  renderPatternInsights();
+  const buildItemsHtml = (items) => items.map(c => {
+    const debate = c.result.debate;
+    let tagClass = 'tag-agree', statusClass = 'status-agree', statusText = 'Agreed';
+    if (debate.high_risk) { tagClass = 'tag-safety'; statusClass = 'status-safety'; statusText = 'Safety stop'; }
+    else if (debate.agreement !== 'agree') { tagClass = 'tag-conflict'; statusClass = 'status-conflict'; statusText = 'Conflict'; }
+    const when = new Date(c.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return `<div class="history-item ${tagClass}" data-id="${c.id}">
+      <div class="history-text">
+        <div class="history-snippet">${escapeHtml(c.case_text)}</div>
+        <div class="history-meta">${when}</div>
+      </div>
+      <span class="history-status ${statusClass}">${statusText}</span>
+    </div>`;
+  }).join('');
+
+  const wireClicks = (containerEl) => {
+    containerEl.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = parseInt(item.getAttribute('data-id'));
+        const c = caseHistory.find(x => x.id === id);
+        if (c) showResultsFor(c);
+      });
+    });
+  };
+
+  // Full History page (already newest-first from the server)
+  const listEl = document.getElementById('historyList');
+  const emptyEl = document.getElementById('historyEmpty');
+  if (caseHistory.length === 0) {
+    emptyEl.style.display = 'block';
+    listEl.innerHTML = '';
+  } else {
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = buildItemsHtml(caseHistory);
+    wireClicks(listEl);
+  }
+
+  // Dashboard recent preview (top 3)
+  const dashListEl = document.getElementById('dashHistoryList');
+  const dashEmptyEl = document.getElementById('dashHistoryEmpty');
+  if (caseHistory.length === 0) {
+    dashEmptyEl.style.display = 'block';
+    dashListEl.innerHTML = '';
+  } else {
+    dashEmptyEl.style.display = 'none';
+    dashListEl.innerHTML = buildItemsHtml(caseHistory.slice(0, 3));
+    wireClicks(dashListEl);
+  }
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ============ case analysis ============
+const submitBtn = document.getElementById('submitBtn');
+const caseInput = document.getElementById('caseInput');
+const statusLine = document.getElementById('statusLine');
+
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => { caseInput.value = chip.dataset.ex; });
+});
+
+submitBtn.addEventListener('click', async () => {
+  const caseText = caseInput.value.trim();
+  if (!caseText) {
+    statusLine.textContent = "Please describe a situation first.";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  showView('loadingView');
+
+  try {
+    const res = await fetch(API_BASE + '/api/cases', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken
+      },
+      body: JSON.stringify({ case_text: caseText, language: document.getElementById('languageSelect').value })
+    });
+    const record = await res.json();
+    if (!res.ok) throw new Error(record.detail || ('Server error ' + res.status));
+
+    await loadHistoryFromServer(); // refresh list so the new case appears
+    showResultsFor(record);
+  } catch (err) {
+    showView('newCaseView');
+    statusLine.textContent = "Something went wrong reaching the agents (" + err.message + "). Please try again.";
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+function confClass(c) {
+  if (c === "strong") return "conf-strong";
+  if (c === "moderate") return "conf-moderate";
+  return "conf-gray";
+}
+function confLabel(c) {
+  if (c === "strong") return "Strong evidence";
+  if (c === "moderate") return "Moderate confidence";
+  return "Gray area";
+}
+
+function showResultsFor(record) {
+  activeCaseId = record.id;
+  document.getElementById('resultsCaseText').textContent = record.case_text;
+  document.getElementById('resultsCaseTypeBadge').textContent = record.result.case_type || 'General Inquiry';
+  const appealContainer = document.getElementById('appealLetterContainer');
+  appealContainer.style.display = 'none';
+  appealContainer.innerHTML = '';
+  const priorityRow = document.getElementById('priorityRow');
+  priorityRow.style.display = record.result.debate.high_risk ? 'none' : 'flex';
+  document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+  const body = document.getElementById('resultsBody');
+  const { medical, rights, risk, second_opinion, debate } = record.result;
+
+  if (debate.high_risk) {
+    body.innerHTML = `
+      <div class="safety-block">
+        <h2>⚠ Safety stop-gate triggered</h2>
+        <p>This case describes symptoms or a situation that may be urgent or life-threatening. This system will not continue with routine analysis. Please seek immediate care from a real doctor, or call your local emergency number, right now &mdash; and separately consult a qualified legal/insurance professional for the rights side once you are safe.</p>
+      </div>`;
+  } else {
+    const secondOpinionHtml = second_opinion ? `
+      <div class="debate-card" style="margin-top:14px;">
+        <span class="${second_opinion.agrees_with_medical_agent ? 'agree-tag' : 'conflict-tag'}">${second_opinion.agrees_with_medical_agent ? 'Second opinion agrees' : 'Second opinion challenges this'}</span>
+        <h2>Second opinion on the Medical finding</h2>
+        <p class="debate-text">${second_opinion.challenge}</p>
+      </div>` : '';
+
+    body.innerHTML = `
+      <div class="agent-grid">
+        <div class="agent-card medical">
+          <div class="agent-label"><span class="dot"></span>Medical Evidence Agent</div>
+          <div class="agent-finding">${medical.finding}</div>
+          <div class="agent-reasoning">${medical.reasoning}</div>
+          <span class="confidence-badge ${confClass(medical.confidence)}">${confLabel(medical.confidence)}</span>
+          ${feedbackRowHtml(record.id, 'medical')}
+        </div>
+        <div class="agent-card rights">
+          <div class="agent-label"><span class="dot"></span>Cost / Insurance Rights Agent</div>
+          <div class="agent-finding">${rights.finding}</div>
+          <div class="agent-reasoning">${rights.reasoning}</div>
+          <span class="confidence-badge ${confClass(rights.confidence)}">${confLabel(rights.confidence)}</span>
+          ${feedbackRowHtml(record.id, 'rights')}
+        </div>
+        <div class="agent-card risk">
+          <div class="agent-label"><span class="dot"></span>Risk-of-Waiting Agent</div>
+          <div class="agent-finding">${risk.finding}</div>
+          <div class="agent-reasoning">${risk.reasoning}</div>
+          <span class="confidence-badge ${confClass(risk.confidence)}">${confLabel(risk.confidence)}</span>
+          ${feedbackRowHtml(record.id, 'risk')}
+        </div>
+      </div>
+      <div class="debate-card">
+        <span class="${debate.agreement === 'agree' ? 'agree-tag' : 'conflict-tag'}">${debate.agreement === 'agree' ? 'Agents agree' : 'Agents disagree'}</span>
+        <h2>Debate &amp; comparison</h2>
+        <p class="debate-text">${debate.summary}</p>
+      </div>
+      ${secondOpinionHtml}
+    `;
+    wireFeedbackButtons();
+  }
+  showView('resultsView');
+}
+
+// ============ feedback ============
+function feedbackRowHtml(caseId, agent) {
+  return `<div class="feedback-row" data-agent="${agent}">
+    <span class="feedback-label">Was this helpful?</span>
+    <button class="feedback-btn" data-rating="up">&#128077;</button>
+    <button class="feedback-btn" data-rating="down">&#128078;</button>
+  </div>`;
+}
+
+function wireFeedbackButtons() {
+  document.querySelectorAll('.feedback-row').forEach(row => {
+    const agent = row.getAttribute('data-agent');
+    row.querySelectorAll('.feedback-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const rating = btn.getAttribute('data-rating');
+        row.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('selected-up', 'selected-down'));
+        btn.classList.add(rating === 'up' ? 'selected-up' : 'selected-down');
+        try {
+          await fetch(API_BASE + '/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ case_id: activeCaseId, agent, rating })
+          });
+          if (!row.querySelector('.feedback-sent')) {
+            row.insertAdjacentHTML('beforeend', '<span class="feedback-sent">Thanks!</span>');
+          }
+        } catch (err) { /* fail silently, not critical */ }
+      });
+    });
+  });
+}
+
+// ============ text-to-speech ============
+document.getElementById('speakBtn').addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) {
+    alert('Text-to-speech is not supported in this browser.');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const record = caseHistory.find(c => c.id === activeCaseId);
+  if (!record) return;
+  const { medical, rights, risk, debate } = record.result;
+  const parts = [
+    'Medical Evidence Agent: ' + medical.finding + '. ' + medical.reasoning,
+    'Cost and Insurance Rights Agent: ' + rights.finding + '. ' + rights.reasoning,
+    'Risk of Waiting Agent: ' + risk.finding + '. ' + risk.reasoning,
+    'Summary: ' + debate.summary
+  ];
+  const utterance = new SpeechSynthesisUtterance(parts.join('. '));
+  const langMap = { English: 'en-IN', Hindi: 'hi-IN', Tamil: 'ta-IN', Telugu: 'te-IN', Malayalam: 'ml-IN' };
+  utterance.lang = langMap[record.result.language] || 'en-IN';
+  window.speechSynthesis.speak(utterance);
+});
+
+// ============ PDF export (browser print, styled via @media print) ============
+document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+  window.print();
+});
+
+// ============ calendar reminder (.ics download) ============
+document.getElementById('addReminderBtn').addEventListener('click', () => {
+  const record = caseHistory.find(c => c.id === activeCaseId);
+  if (!record) return;
+  const remindDate = new Date();
+  remindDate.setDate(remindDate.getDate() + 7); // 1 week out, a reasonable default follow-up window
+  const dateStr = remindDate.toISOString().slice(0,10).replace(/-/g, '');
+  const summary = 'CareRights AI: Follow up on your case';
+  const description = ('Follow up on: ' + record.case_text).replace(/\n/g, ' ');
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CareRights AI//EN',
+    'BEGIN:VEVENT',
+    'UID:' + record.id + '@carerights-ai',
+    'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z',
+    'DTSTART;VALUE=DATE:' + dateStr,
+    'SUMMARY:' + summary,
+    'DESCRIPTION:' + description,
+    'END:VEVENT', 'END:VCALENDAR'
+  ].join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'carerights-followup-reminder.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ============ appeal letter generation ============
+document.getElementById('appealLetterBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('appealLetterBtn');
+  const container = document.getElementById('appealLetterContainer');
+
+  const record = caseHistory.find(c => c.id === activeCaseId);
+  if (!record) return;
+  if (record.result.debate.high_risk) {
+    alert('An appeal letter is not available for safety-blocked cases — please consult a real doctor or legal professional first.');
+    return;
+  }
+
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Writing letter...';
+
+  try {
+    const res = await fetch(API_BASE + '/api/cases/' + activeCaseId + '/appeal-letter', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('Server error ' + res.status));
+
+    container.innerHTML = `
+      <div class="letter-card">
+        <h2>Appeal Letter</h2>
+        <div class="letter-text">${escapeHtml(data.letter)}</div>
+        <p class="letter-note">Review before sending — fill in your name, policy number, and the insurer's details. Use "Save PDF" above to download this along with your results.</p>
+      </div>`;
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    alert('Could not generate the letter (' + err.message + '). Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+// ============ priority weighting (re-emphasizes existing results, no new AI call) ============
+document.querySelectorAll('.priority-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const priority = btn.getAttribute('data-priority'); // 'medical' | 'rights' | 'risk'
+
+    document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('.agent-card').forEach(card => {
+      card.classList.remove('prioritized');
+      const existingPin = card.querySelector('.priority-pin');
+      if (existingPin) existingPin.remove();
+    });
+
+    const targetCard = document.querySelector('.agent-card.' + priority);
+    if (targetCard) {
+      targetCard.classList.add('prioritized');
+      const label = targetCard.querySelector('.agent-label');
+      if (label) {
+        label.insertAdjacentHTML('beforebegin', '<div class="priority-pin">&#128204; What matters most to you</div>');
+      }
+    }
+  });
+});
+
+// ============ profile page ============
+async function loadProfile() {
+  const detailsEl = document.getElementById('profileDetails');
+  detailsEl.textContent = 'Loading…';
+  try {
+    const res = await fetch(API_BASE + '/api/me', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Could not load profile.');
+    const memberSince = data.created_at
+      ? new Date(data.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'unknown';
+    detailsEl.innerHTML = `
+      <strong>Name:</strong> ${escapeHtml(data.name)}<br>
+      <strong>Email:</strong> ${escapeHtml(data.email)}<br>
+      <strong>Member since:</strong> ${memberSince}<br>
+      <strong>Cases analyzed:</strong> ${data.case_count}
+    `;
+  } catch (err) {
+    detailsEl.textContent = 'Could not load profile (' + err.message + ').';
+  }
+}
+
+document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+  const currentPw = document.getElementById('currentPasswordInput').value;
+  const newPw = document.getElementById('newPasswordInput').value;
+  const errorEl = document.getElementById('passwordChangeError');
+  const successEl = document.getElementById('passwordChangeSuccess');
+  errorEl.style.display = 'none';
+  successEl.style.display = 'none';
+
+  if (!currentPw || !newPw) {
+    errorEl.textContent = 'Please fill in both fields.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('changePasswordBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch(API_BASE + '/api/me/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+      body: JSON.stringify({ current_password: currentPw, new_password: newPw })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Could not update password.');
+    successEl.style.display = 'block';
+    document.getElementById('currentPasswordInput').value = '';
+    document.getElementById('newPasswordInput').value = '';
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
