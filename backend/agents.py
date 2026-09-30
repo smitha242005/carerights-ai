@@ -12,6 +12,8 @@ Get a free key at https://aistudio.google.com/apikey and set it as GEMINI_API_KE
 import os
 import json
 import time
+import re
+import threading
 from google import genai
 from google.genai import types
 from rag import retrieve_medical, retrieve_insurance
@@ -22,6 +24,24 @@ MODELS = [m.strip() for m in os.environ.get("GEMINI_MODELS", "gemini-3.6-flash")
 MODEL = MODELS[0]
 
 _client = None
+
+# Free tier allows only 5 requests per MINUTE per model. Keep a sliding window of
+# recent call times and wait if we are about to go over (uses 4 of 5 as a safety margin).
+_CALLS_PER_MIN = int(os.environ.get("GEMINI_CALLS_PER_MIN", "4"))
+_call_times = []
+_lock = threading.Lock()
+
+def _throttle():
+    while True:
+        with _lock:
+            now = time.time()
+            while _call_times and now - _call_times[0] > 60:
+                _call_times.pop(0)
+            if len(_call_times) < _CALLS_PER_MIN:
+                _call_times.append(now)
+                return
+            wait = 60 - (now - _call_times[0]) + 0.5
+        time.sleep(max(wait, 0.5))
 
 def _get_client():
     """Lazy client creation — so the rest of the app (signup, login, RAG, etc.) still
@@ -54,7 +74,8 @@ def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) 
         if model.startswith("gemini-3"):
             cfg["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
         done = False
-        for attempt in range(3):  # retry temporary overloads (503) a couple of times
+        for attempt in range(5):
+            _throttle()
             try:
                 response = _get_client().models.generate_content(
                     model=model,
@@ -67,11 +88,16 @@ def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) 
                 msg = str(e)
                 if "503" in msg or "UNAVAILABLE" in msg:
                     last_err = e
-                    time.sleep(2 * (attempt + 1))  # wait 2s, 4s, 6s then retry
+                    time.sleep(2 * (attempt + 1))  # Google busy: wait and retry
                     continue
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     last_err = e
-                    break  # daily quota used up on this model, go to next model
+                    if "PerDay" in msg:
+                        break  # daily quota used up on this model, go to next model
+                    # per-minute limit: wait the time Google asks for, then retry
+                    m = re.search(r"retry in ([0-9.]+)s", msg) or re.search(r"'retryDelay': '(\d+)s'", msg)
+                    time.sleep((float(m.group(1)) if m else 20) + 1)
+                    continue
                 raise
         if done:
             break
