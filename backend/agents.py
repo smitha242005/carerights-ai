@@ -11,11 +11,15 @@ Get a free key at https://aistudio.google.com/apikey and set it as GEMINI_API_KE
 
 import os
 import json
+import time
 from google import genai
 from google.genai import types
 from rag import retrieve_medical, retrieve_insurance
 
-MODEL = "gemini-3.6-flash"  # current stable free-tier model (gemini-2.5-flash was retired)
+# Comma-separated list of models. If one hits its daily quota (429), the next one is tried.
+# Change on Render with the GEMINI_MODELS environment variable, no code edit needed.
+MODELS = [m.strip() for m in os.environ.get("GEMINI_MODELS", "gemini-3.6-flash").split(",") if m.strip()]
+MODEL = MODELS[0]
 
 _client = None
 
@@ -39,16 +43,40 @@ def _get_client():
 def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> str:
     """Calls Gemini. Kept this function name (_call_claude) so nothing else in this
     file needs renaming — it's just the "call the LLM" function now, provider-agnostic."""
-    response = _get_client().models.generate_content(
-        model=MODEL,
-        contents=user_content,
-        config=types.GenerateContentConfig(
+    last_err = None
+    for model in MODELS:
+        cfg = dict(
             system_instruction=system_prompt,
             max_output_tokens=max_tokens,
             temperature=0.3,
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),  # Gemini 3.x uses thinking_level (not thinking_budget, which is 2.5-only) — MINIMAL keeps the token budget for the actual answer
-        ),
-    )
+        )
+        # thinking_level only exists on Gemini 3.x models
+        if model.startswith("gemini-3"):
+            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
+        done = False
+        for attempt in range(3):  # retry temporary overloads (503) a couple of times
+            try:
+                response = _get_client().models.generate_content(
+                    model=model,
+                    contents=user_content,
+                    config=types.GenerateContentConfig(**cfg),
+                )
+                done = True
+                break
+            except Exception as e:
+                msg = str(e)
+                if "503" in msg or "UNAVAILABLE" in msg:
+                    last_err = e
+                    time.sleep(2 * (attempt + 1))  # wait 2s, 4s, 6s then retry
+                    continue
+                if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                    last_err = e
+                    break  # daily quota used up on this model, go to next model
+                raise
+        if done:
+            break
+    else:
+        raise last_err
     return response.text
 
 
