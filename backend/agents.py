@@ -96,32 +96,56 @@ def _generate_groq(system_prompt: str, user_content: str, max_tokens: int) -> st
     return data["choices"][0]["message"]["content"]
 
 
-def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> str:
-    """Calls Gemini with retry + fallback. Kept this function name (_call_claude) so nothing
-    else in this file needs renaming — it's just the "call the LLM" function now."""
+def _try_gemini(system_prompt: str, user_content: str, max_tokens: int):
+    """Gemini with retries, then the fallback Gemini model. Returns (text, last_error)."""
     last_error = None
     for model in [MODEL] + FALLBACK_MODELS:
         for attempt in range(len(RETRY_DELAYS) + 1):
             try:
-                return _generate(model, system_prompt, user_content, max_tokens)
+                return _generate(model, system_prompt, user_content, max_tokens), None
             except Exception as e:
                 last_error = e
                 if not _is_transient(e):
                     break  # e.g. wrong model name -> move on to the next model
                 if attempt < len(RETRY_DELAYS):
                     time.sleep(RETRY_DELAYS[attempt])
-    # Every Gemini attempt failed -> try the backup provider, if a key is configured.
-    if os.environ.get("GROQ_API_KEY"):
-        for attempt in range(2):
-            try:
-                return _generate_groq(system_prompt, user_content, max_tokens)
-            except Exception as e:
-                last_error = e
-                if attempt == 0 and _is_transient(e):
-                    time.sleep(2)
-                else:
-                    break
-    raise last_error
+    return None, last_error
+
+
+def _try_groq(system_prompt: str, user_content: str, max_tokens: int):
+    """Groq with one retry. Returns (text, last_error). Skipped if GROQ_API_KEY is not set."""
+    if not os.environ.get("GROQ_API_KEY"):
+        return None, RuntimeError("GROQ_API_KEY not set")
+    last_error = None
+    for attempt in range(2):
+        try:
+            return _generate_groq(system_prompt, user_content, max_tokens), None
+        except Exception as e:
+            last_error = e
+            if attempt == 0 and _is_transient(e):
+                time.sleep(2)
+            else:
+                break
+    return None, last_error
+
+
+def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> str:
+    """Calls the LLM with automatic backup. Kept this function name (_call_claude) so nothing
+    else in this file needs renaming.
+
+    Default order: Gemini (with retries) -> Groq.
+    Set LLM_PRIMARY=groq in the environment to go Groq first (much faster) -> Gemini."""
+    groq_first = os.environ.get("LLM_PRIMARY", "").strip().lower() == "groq"
+    order = (_try_groq, _try_gemini) if groq_first else (_try_gemini, _try_groq)
+    errors = []
+    for attempt_fn in order:
+        text, err = attempt_fn(system_prompt, user_content, max_tokens)
+        if text is not None:
+            return text
+        errors.append(err)
+    # report the most useful error (ignore the "key not set" one if there is a real one)
+    real = [e for e in errors if "GROQ_API_KEY not set" not in str(e)]
+    raise (real[0] if real else errors[0])
 
 
 def _parse_json(raw: str) -> dict:
