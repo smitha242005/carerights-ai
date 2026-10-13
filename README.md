@@ -31,6 +31,33 @@ mockup.
   ready-to-send appeal letter citing the same grounded findings already shown to the user
   — no new claims, just turns the existing evidence into a usable document
 
+## Appeal-letter chatbot (new)
+
+Under the appeal letter there is now a chat box. Type what you want changed ("make it
+shorter", "add that I waited 30 days and my policy number is 12345", "make it more
+urgent") or click a suggestion chip. The letter updates in place, with **Undo**, **Copy**
+and **Download .txt** buttons. You can also click into the letter and type directly.
+The editor only uses the findings and sources already cited in the analysis (it will not
+invent new laws or guidelines), and it calls Gemini only when you send a message.
+Endpoint: `POST /api/cases/{id}/appeal-letter/chat`.
+
+## IMPORTANT: keep accounts after Render restarts (free database)
+
+Render's free plan erases its disk on every restart, redeploy and wake-up from sleep. A
+SQLite file (`carerights.db`) is therefore wiped, and accounts vanish: "I registered, but
+later my login says it's wrong". Fix: use a free hosted PostgreSQL database.
+
+1. Create a free project at https://neon.tech (no card needed) and copy the connection
+   string (looks like `postgresql://user:password@host/dbname?sslmode=require`).
+2. In Render -> your service -> Environment, add `DATABASE_URL` = that string. Save.
+3. Redeploy. Open `https://<your-backend>.onrender.com/api/health` - it should show
+   `"database": "postgresql"`. (If it shows `"sqlite"`, the variable is not set.)
+4. Sign up again once. From now on the account survives restarts.
+
+Locally (no `DATABASE_URL`) the app still uses the SQLite file, so nothing changes for you.
+Emails are now case-insensitive and trimmed, so `Smitha@Gmail.com` and `smitha@gmail.com`
+are the same account.
+
 ## What's genuinely tested vs. what needs your API key
 
 **Tested by me, in a real browser, against a real running server + real database:**

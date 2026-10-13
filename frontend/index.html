@@ -626,9 +626,42 @@
     margin-top: 10px;
   }
 
+
+  /* ---- appeal-letter chatbot ---- */
+  .letter-text[contenteditable] { outline: none; }
+  .letter-text[contenteditable]:focus { border-color: var(--medical); box-shadow: 0 0 0 2px var(--medical-dim); }
+  .letter-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .letter-actions button, .chat-chip {
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    padding: 6px 12px; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 3px; cursor: pointer;
+  }
+  .letter-actions button:hover, .chat-chip:hover { background: var(--paper-dim); }
+  .letter-actions button:disabled { opacity: 0.45; cursor: default; }
+  .letter-chat { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .letter-chat h3 { font-family: 'Fraunces', serif; font-size: 15px; margin: 0 0 4px; color: var(--ink); }
+  .letter-chat .chat-hint { font-size: 12px; color: var(--ink-soft); margin: 0 0 10px; }
+  .chat-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chat-log { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .chat-msg { font-size: 13px; line-height: 1.5; padding: 8px 12px; border-radius: 4px; max-width: 88%; white-space: pre-wrap; }
+  .chat-msg.user { align-self: flex-end; background: var(--medical-dim); color: var(--ink); }
+  .chat-msg.bot { align-self: flex-start; background: var(--paper-dim); color: var(--ink); border: 1px solid var(--line); }
+  .chat-msg.err { align-self: flex-start; background: var(--alert-dim); color: var(--alert); }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input {
+    flex: 1; font-family: 'Inter', sans-serif; font-size: 13px; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--ink);
+  }
+  .chat-input-row button {
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 18px;
+    background: var(--ink); color: var(--paper); border: none; border-radius: 3px; cursor: pointer;
+  }
+  .chat-input-row button:disabled { opacity: 0.5; cursor: default; }
+  .chat-input-row input:disabled { background: var(--paper-dim); }
+
   @media print {
     body { background: white !important; color: black !important; }
-    .topbar, .no-print, .results-toolbar, .back-link, .feedback-row { display: none !important; }
+    .topbar, .no-print, .results-toolbar, .back-link, .feedback-row, .letter-chat, .letter-actions { display: none !important; }
     .agent-card, .debate-card, .safety-block, .letter-card { box-shadow: none !important; border: 1px solid #ccc !important; }
     .case-context, .case-context span { color: black !important; }
   }
@@ -1043,6 +1076,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   } catch (err) { /* logout locally regardless */ }
   appShell.style.display = 'none';
   loginView.style.display = 'flex';
+  tabLogin.click(); // always return to the Log in tab after logging out
   document.getElementById('emailInput').value = '';
   document.getElementById('passInput').value = '';
   document.getElementById('nameInput').value = '';
@@ -1423,12 +1457,7 @@ document.getElementById('appealLetterBtn').addEventListener('click', async () =>
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || ('Server error ' + res.status));
 
-    container.innerHTML = `
-      <div class="letter-card">
-        <h2>Appeal Letter</h2>
-        <div class="letter-text">${escapeHtml(data.letter)}</div>
-        <p class="letter-note">Review before sending — fill in your name, policy number, and the insurer's details. Use "Save PDF" above to download this along with your results.</p>
-      </div>`;
+    renderLetterCard(container, data.letter);
     container.style.display = 'block';
     container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (err) {
@@ -1438,6 +1467,118 @@ document.getElementById('appealLetterBtn').addEventListener('click', async () =>
     btn.textContent = originalText;
   }
 });
+
+
+// ============ appeal letter chatbot (edit the letter by chatting) ============
+let letterVersions = [];   // previous versions, so "Undo" works
+
+function renderLetterCard(container, letterText) {
+  letterVersions = [];
+  container.innerHTML = `
+    <div class="letter-card">
+      <h2>Appeal Letter</h2>
+      <div class="letter-text" id="letterText" contenteditable="plaintext-only" spellcheck="true"></div>
+      <p class="letter-note">Review before sending — fill in your name, policy number, and the insurer's details. You can also click inside the letter and type to edit it directly. Use "Save PDF" above to download this along with your results.</p>
+      <div class="letter-actions no-print">
+        <button id="letterUndoBtn" disabled>&#8630; Undo last change</button>
+        <button id="letterCopyBtn">&#128203; Copy letter</button>
+        <button id="letterDownloadBtn">&#11015; Download .txt</button>
+      </div>
+      <div class="letter-chat no-print">
+        <h3>&#128172; Edit this letter by chatting</h3>
+        <p class="chat-hint">Tell me what to change. I only use the sources already cited in your analysis — I won't invent new ones.</p>
+        <div class="chat-chips">
+          <button class="chat-chip">Make it shorter</button>
+          <button class="chat-chip">Make it more formal</button>
+          <button class="chat-chip">Make it more urgent</button>
+          <button class="chat-chip">Use simpler words</button>
+          <button class="chat-chip">Ask for a reply within 15 days</button>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" maxlength="1000" placeholder="e.g. Add that I have waited 30 days and my policy number is 12345">
+          <button id="chatSendBtn">Send</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('letterText').textContent = letterText;
+  wireLetterChat();
+}
+
+function currentLetter() {
+  return document.getElementById('letterText').innerText.replace(/ /g, ' ').trim();
+}
+
+function addChatMsg(kind, text) {
+  const log = document.getElementById('chatLog');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + kind;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendLetterChat(message) {
+  const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSendBtn');
+  const letterEl = document.getElementById('letterText');
+  message = (message || '').trim();
+  if (!message) return;
+
+  addChatMsg('user', message);
+  input.value = '';
+  input.disabled = true; sendBtn.disabled = true; sendBtn.textContent = 'Editing…';
+  const before = currentLetter();
+
+  try {
+    const res = await fetch(API_BASE + '/api/cases/' + activeCaseId + '/appeal-letter/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+      body: JSON.stringify({ letter: before, message })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('Server error ' + res.status));
+    if (data.letter.trim() !== before) {
+      letterVersions.push(before);
+      letterEl.textContent = data.letter;
+      document.getElementById('letterUndoBtn').disabled = false;
+    }
+    addChatMsg('bot', data.reply);
+  } catch (err) {
+    addChatMsg('err', 'Sorry, that did not work (' + err.message + '). Your letter is unchanged — please try again.');
+  } finally {
+    input.disabled = false; sendBtn.disabled = false; sendBtn.textContent = 'Send';
+    input.focus();
+  }
+}
+
+function wireLetterChat() {
+  const input = document.getElementById('chatInput');
+  document.getElementById('chatSendBtn').addEventListener('click', () => sendLetterChat(input.value));
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendLetterChat(input.value); } });
+  document.querySelectorAll('.chat-chip').forEach(chip =>
+    chip.addEventListener('click', () => sendLetterChat(chip.textContent)));
+
+  document.getElementById('letterUndoBtn').addEventListener('click', () => {
+    if (!letterVersions.length) return;
+    document.getElementById('letterText').textContent = letterVersions.pop();
+    if (!letterVersions.length) document.getElementById('letterUndoBtn').disabled = true;
+    addChatMsg('bot', 'Undone — went back to the previous version.');
+  });
+  document.getElementById('letterCopyBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    try { await navigator.clipboard.writeText(currentLetter()); btn.textContent = '✓ Copied'; }
+    catch { btn.textContent = 'Select the text and press Ctrl+C'; }
+    setTimeout(() => { btn.innerHTML = '&#128203; Copy letter'; }, 1800);
+  });
+  document.getElementById('letterDownloadBtn').addEventListener('click', () => {
+    const blob = new Blob([currentLetter()], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'appeal-letter.txt'; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
 
 // ============ priority weighting (re-emphasizes existing results, no new AI call) ============
 document.querySelectorAll('.priority-btn').forEach(btn => {
@@ -1489,8 +1630,8 @@ async function loadProfile() {
 }
 
 document.getElementById('changePasswordBtn').addEventListener('click', async () => {
-  const currentPw = document.getElementById('currentPasswordInput').value;
-  const newPw = document.getElementById('newPasswordInput').value;
+  const currentPw = document.getElementById('currentPasswordInput').value.trim();
+  const newPw = document.getElementById('newPasswordInput').value.trim();
   const errorEl = document.getElementById('passwordChangeError');
   const successEl = document.getElementById('passwordChangeSuccess');
   errorEl.style.display = 'none';

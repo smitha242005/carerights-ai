@@ -21,8 +21,21 @@ agents.generate_appeal_letter = lambda case_text, medical, rights, language="Eng
     "Sincerely,\n[Your name]"
 )
 
+def _fake_edit(letter, instruction, case_text, medical, rights, language="English"):
+    """Pretend editor so you can try the chat box without spending Gemini quota."""
+    text = instruction.lower()
+    if "short" in text:
+        new = letter.split("\n\n")[0] + "\n\n[TEST MODE] Shortened version.\n\nSincerely,\n[Your name]"
+    else:
+        new = letter + "\n\n[TEST MODE edit applied: " + instruction + "]"
+    return {"reply": "(test mode) I applied your change: " + instruction, "letter": new}
+
+main_mod_agents = agents
+main_mod_agents.edit_appeal_letter = _fake_edit
+
 import uvicorn
 import main as main_module
+main_module.edit_appeal_letter = _fake_edit
 
 if __name__ == "__main__":
     uvicorn.run(main_module.app, host="127.0.0.1", port=8000)

@@ -2,7 +2,8 @@
 main.py — CareRights AI backend API.
 
 Run with:  uvicorn main:app --reload --port 8000
-Requires:  export ANTHROPIC_API_KEY=your_key_here   (or a .env file, see README)
+Requires:  export GEMINI_API_KEY=your_key_here
+Optional:  export DATABASE_URL=postgresql://...   (keeps accounts after Render restarts)
 """
 
 from fastapi import FastAPI, HTTPException, Header
@@ -11,7 +12,7 @@ from pydantic import BaseModel, EmailStr
 import os
 
 import database as db
-from agents import analyze_case, generate_appeal_letter
+from agents import analyze_case, generate_appeal_letter, edit_appeal_letter
 
 app = FastAPI(title="CareRights AI API")
 
@@ -71,6 +72,16 @@ class LoginRequest(BaseModel):
 class CaseRequest(BaseModel):
     case_text: str
     language: str = "English"  # English, Hindi, Tamil, Telugu, Malayalam
+
+
+class LetterChatRequest(BaseModel):
+    letter: str       # the letter exactly as it currently appears on screen
+    message: str      # what the user wants changed, e.g. "make it shorter"
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 class FeedbackRequest(BaseModel):
@@ -187,11 +198,54 @@ def create_appeal_letter(case_id: int, authorization: str | None = Header(defaul
     return {"letter": letter}
 
 
+@app.post("/api/cases/{case_id}/appeal-letter/chat")
+def chat_edit_appeal_letter(case_id: int, req: LetterChatRequest, authorization: str | None = Header(default=None)):
+    """Conversational editing of the appeal letter. Only called when the user sends a
+    chat message, so it uses Gemini quota only on request."""
+    user = get_current_user(authorization)
+    case = db.get_case_by_id(case_id, user["id"])
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    result = case["result"]
+    if "medical" not in result or "rights" not in result:
+        raise HTTPException(status_code=400, detail="This case has no findings to base a letter on.")
+    message = req.message.strip()
+    letter = req.letter.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Please type what you want changed.")
+    if len(message) > 1000:
+        raise HTTPException(status_code=400, detail="Message is too long (max 1000 characters).")
+    if not letter or len(letter) > 10000:
+        raise HTTPException(status_code=400, detail="The letter is empty or too long to edit.")
+    try:
+        edited = edit_appeal_letter(
+            letter, message, case["case_text"], result["medical"], result["rights"],
+            language=result.get("language", "English"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Letter editing failed: {e}")
+    return edited
+
+
 @app.get("/api/me")
 def get_me(authorization: str | None = Header(default=None)):
-    return get_current_user(authorization)
+    user = get_current_user(authorization)
+    return db.get_profile(user["id"])
+
+
+@app.post("/api/me/change-password")
+def change_password(req: ChangePasswordRequest, authorization: str | None = Header(default=None)):
+    user = get_current_user(authorization)
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
+    token = authorization.removeprefix("Bearer ").strip()
+    if not db.change_password(user["id"], req.current_password, req.new_password, keep_token=token):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    return {"ok": True}
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    # "database" tells you whether accounts are kept permanently (postgresql) or in a
+    # file that Render's free plan erases on restart (sqlite).
+    return {"status": "ok", "database": db.backend_name()}
