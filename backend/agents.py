@@ -69,7 +69,7 @@ def _generate(model: str, system_prompt: str, user_content: str, max_tokens: int
 # ---- Backup provider: Groq (free tier, no credit card). Used only if every Gemini attempt fails.
 # Get a free key at https://console.groq.com/keys and set GROQ_API_KEY. If it is not set,
 # this backup is simply skipped. Model can be changed with GROQ_MODEL.
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")  # free-tier model; "openai/gpt-oss-20b" is a smaller, faster alternative
 GROQ_URL = os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
 
 
@@ -77,13 +77,17 @@ def _generate_groq(system_prompt: str, user_content: str, max_tokens: int) -> st
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY not set")
-    body = json.dumps({
+    payload = {
         "model": GROQ_MODEL,
         "messages": [{"role": "system", "content": system_prompt},
                      {"role": "user", "content": user_content}],
         "max_tokens": max_tokens,
         "temperature": 0.3,
-    }).encode("utf-8")
+    }
+    if GROQ_MODEL.startswith("openai/gpt-oss"):
+        # these are reasoning models: keep thinking short so the answer isn't cut off
+        payload["reasoning_effort"] = "low"
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(GROQ_URL, data=body, headers={
         "Authorization": "Bearer " + api_key, "Content-Type": "application/json",
         "User-Agent": "CareRightsAI/1.0",
@@ -117,15 +121,15 @@ def _try_groq(system_prompt: str, user_content: str, max_tokens: int):
     if not os.environ.get("GROQ_API_KEY"):
         return None, RuntimeError("GROQ_API_KEY not set")
     last_error = None
-    for attempt in range(2):
+    delays = [2, 5]
+    for attempt in range(len(delays) + 1):
         try:
             return _generate_groq(system_prompt, user_content, max_tokens), None
         except Exception as e:
             last_error = e
-            if attempt == 0 and _is_transient(e):
-                time.sleep(2)
-            else:
+            if not _is_transient(e) or attempt == len(delays):
                 break
+            time.sleep(delays[attempt])
     return None, last_error
 
 
