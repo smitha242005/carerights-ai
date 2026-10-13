@@ -43,7 +43,7 @@ def _get_client():
 # Free-tier Gemini is often "overloaded" (503) or rate-limited (429) for a few seconds.
 # Instead of failing the whole case, we retry with a short wait, then fall back to a
 # second model. Fallback models can be changed with GEMINI_FALLBACK_MODELS (comma-separated).
-RETRY_DELAYS = [2, 5, 10]  # seconds to wait before retry 1, 2, 3
+RETRY_DELAYS = [1, 3]  # seconds to wait before retry 1, 2 (kept short so users never wait minutes)
 FALLBACK_MODELS = [m.strip() for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest").split(",") if m.strip()]
 _TRANSIENT_MARKERS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "500", "INTERNAL", "DEADLINE", "timed out", "overloaded")
 
@@ -139,13 +139,39 @@ def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) 
     order = (_try_groq, _try_gemini) if groq_first else (_try_gemini, _try_groq)
     errors = []
     for attempt_fn in order:
+        started = time.time()
         text, err = attempt_fn(system_prompt, user_content, max_tokens)
+        name = attempt_fn.__name__.replace("_try_", "")
         if text is not None:
+            print(f"[llm] {name} OK in {time.time() - started:.1f}s", flush=True)
             return text
+        print(f"[llm] {name} FAILED after {time.time() - started:.1f}s: {str(err)[:160]}", flush=True)
         errors.append(err)
     # report the most useful error (ignore the "key not set" one if there is a real one)
     real = [e for e in errors if "GROQ_API_KEY not set" not in str(e)]
     raise (real[0] if real else errors[0])
+
+
+def check_providers() -> dict:
+    """Tiny test call to each provider, with timing. Used by GET /api/llm-check so you can
+    see which provider is slow or failing without reading logs."""
+    report = {"primary_setting": os.environ.get("LLM_PRIMARY", "(not set -> Gemini first)"),
+              "groq_key_set": bool(os.environ.get("GROQ_API_KEY")),
+              "gemini_key_set": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")),
+              "gemini_model": MODEL, "groq_model": GROQ_MODEL}
+    started = time.time()
+    try:
+        out = _generate_groq("Reply with the single word OK.", "ping", 10)
+        report["groq"] = {"ok": True, "seconds": round(time.time() - started, 1), "reply": out[:30]}
+    except Exception as e:
+        report["groq"] = {"ok": False, "seconds": round(time.time() - started, 1), "error": str(e)[:200]}
+    started = time.time()
+    try:
+        out = _generate(MODEL, "Reply with the single word OK.", "ping", 10)
+        report["gemini"] = {"ok": True, "seconds": round(time.time() - started, 1), "reply": (out or "")[:30]}
+    except Exception as e:
+        report["gemini"] = {"ok": False, "seconds": round(time.time() - started, 1), "error": str(e)[:200]}
+    return report
 
 
 def _parse_json(raw: str) -> dict:

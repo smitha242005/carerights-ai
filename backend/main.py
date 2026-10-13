@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr
 import os
 
 import database as db
-from agents import analyze_case, generate_appeal_letter, edit_appeal_letter
+from agents import analyze_case, generate_appeal_letter, edit_appeal_letter, check_providers
 
 app = FastAPI(title="CareRights AI API")
 
@@ -242,6 +242,13 @@ def change_password(req: ChangePasswordRequest, authorization: str | None = Head
     if not db.change_password(user["id"], req.current_password, req.new_password, keep_token=token):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
     return {"ok": True}
+
+
+@app.get("/api/llm-check")
+def llm_check():
+    """Diagnostic: tests Groq and Gemini with a 1-word request and reports timing/errors.
+    Open this URL in a browser if the app feels slow. Never shows your keys."""
+    return check_providers()
 
 
 @app.get("/api/health")
