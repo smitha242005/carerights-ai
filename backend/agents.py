@@ -11,6 +11,10 @@ Get a free key at https://aistudio.google.com/apikey and set it as GEMINI_API_KE
 
 import os
 import json
+import time
+import urllib.request
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from google import genai
 from google.genai import types
 from rag import retrieve_medical, retrieve_insurance
@@ -36,20 +40,88 @@ def _get_client():
     return _client
 
 
-def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> str:
-    """Calls Gemini. Kept this function name (_call_claude) so nothing else in this
-    file needs renaming — it's just the "call the LLM" function now, provider-agnostic."""
+# Free-tier Gemini is often "overloaded" (503) or rate-limited (429) for a few seconds.
+# Instead of failing the whole case, we retry with a short wait, then fall back to a
+# second model. Fallback models can be changed with GEMINI_FALLBACK_MODELS (comma-separated).
+RETRY_DELAYS = [2, 5, 10]  # seconds to wait before retry 1, 2, 3
+FALLBACK_MODELS = [m.strip() for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest").split(",") if m.strip()]
+_TRANSIENT_MARKERS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "500", "INTERNAL", "DEADLINE", "timed out", "overloaded")
+
+
+def _is_transient(err: Exception) -> bool:
+    text = str(err)
+    return any(m in text for m in _TRANSIENT_MARKERS)
+
+
+def _generate(model: str, system_prompt: str, user_content: str, max_tokens: int) -> str:
+    config = dict(system_instruction=system_prompt, max_output_tokens=max_tokens, temperature=0.3)
+    if "gemini-3" in model:
+        # Gemini 3.x uses thinking_level (not thinking_budget, which is 2.5-only) — MINIMAL keeps
+        # the token budget for the actual answer
+        config["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
     response = _get_client().models.generate_content(
-        model=MODEL,
-        contents=user_content,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=max_tokens,
-            temperature=0.3,
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),  # Gemini 3.x uses thinking_level (not thinking_budget, which is 2.5-only) — MINIMAL keeps the token budget for the actual answer
-        ),
+        model=model, contents=user_content, config=types.GenerateContentConfig(**config),
     )
     return response.text
+
+
+
+# ---- Backup provider: Groq (free tier, no credit card). Used only if every Gemini attempt fails.
+# Get a free key at https://console.groq.com/keys and set GROQ_API_KEY. If it is not set,
+# this backup is simply skipped. Model can be changed with GROQ_MODEL.
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_URL = os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
+
+
+def _generate_groq(system_prompt: str, user_content: str, max_tokens: int) -> str:
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not set")
+    body = json.dumps({
+        "model": GROQ_MODEL,
+        "messages": [{"role": "system", "content": system_prompt},
+                     {"role": "user", "content": user_content}],
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+    }).encode("utf-8")
+    req = urllib.request.Request(GROQ_URL, data=body, headers={
+        "Authorization": "Bearer " + api_key, "Content-Type": "application/json",
+        "User-Agent": "CareRightsAI/1.0",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Groq {e.code}: {e.read().decode('utf-8', 'ignore')[:200]}") from e
+    return data["choices"][0]["message"]["content"]
+
+
+def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> str:
+    """Calls Gemini with retry + fallback. Kept this function name (_call_claude) so nothing
+    else in this file needs renaming — it's just the "call the LLM" function now."""
+    last_error = None
+    for model in [MODEL] + FALLBACK_MODELS:
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            try:
+                return _generate(model, system_prompt, user_content, max_tokens)
+            except Exception as e:
+                last_error = e
+                if not _is_transient(e):
+                    break  # e.g. wrong model name -> move on to the next model
+                if attempt < len(RETRY_DELAYS):
+                    time.sleep(RETRY_DELAYS[attempt])
+    # Every Gemini attempt failed -> try the backup provider, if a key is configured.
+    if os.environ.get("GROQ_API_KEY"):
+        for attempt in range(2):
+            try:
+                return _generate_groq(system_prompt, user_content, max_tokens)
+            except Exception as e:
+                last_error = e
+                if attempt == 0 and _is_transient(e):
+                    time.sleep(2)
+                else:
+                    break
+    raise last_error
 
 
 def _parse_json(raw: str) -> dict:
@@ -288,10 +360,12 @@ def edit_appeal_letter(letter: str, instruction: str, case_text: str, medical: d
 
 
 def analyze_case(case_text: str, language: str = "English") -> dict:
-    """Full pipeline: 3 agents -> second opinion -> debate/safety synthesis."""
-    medical = run_medical_agent(case_text, language=language)
-    rights = run_rights_agent(case_text, language=language)
-    risk = run_risk_agent(case_text, language=language)
+    """Full pipeline: 3 agents (in parallel) -> second opinion -> debate/safety synthesis."""
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_medical = pool.submit(run_medical_agent, case_text, language)
+        f_rights = pool.submit(run_rights_agent, case_text, language)
+        f_risk = pool.submit(run_risk_agent, case_text, language)
+        medical, rights, risk = f_medical.result(), f_rights.result(), f_risk.result()
     second_opinion = run_second_opinion_agent(case_text, medical, language=language)
     debate = run_debate(case_text, medical, rights, risk, second_opinion, language=language)
     return {
