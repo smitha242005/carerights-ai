@@ -6,13 +6,14 @@ Requires:  export GEMINI_API_KEY=your_key_here
 Optional:  export DATABASE_URL=postgresql://...   (keeps accounts after Render restarts)
 """
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import os
+import io
 
 import database as db
-from agents import analyze_case, generate_appeal_letter, edit_appeal_letter, check_providers
+from agents import analyze_case, generate_appeal_letter, edit_appeal_letter, generate_next_steps, check_providers
 
 app = FastAPI(title="CareRights AI API")
 
@@ -225,6 +226,69 @@ def chat_edit_appeal_letter(case_id: int, req: LetterChatRequest, authorization:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Letter editing failed: {e}")
     return edited
+
+
+@app.post("/api/cases/{case_id}/next-steps")
+def create_next_steps(case_id: int, authorization: str | None = Header(default=None)):
+    """Grounded 3-5 step action plan. On request only, to save API quota."""
+    user = get_current_user(authorization)
+    case = db.get_case_by_id(case_id, user["id"])
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    result = case["result"]
+    if result.get("debate", {}).get("high_risk"):
+        raise HTTPException(status_code=400, detail="This case was safety-blocked. Please seek real medical help first.")
+    if not all(k in result for k in ("medical", "rights", "risk")):
+        raise HTTPException(status_code=400, detail="This case has no findings to base a plan on.")
+    try:
+        return generate_next_steps(case["case_text"], result["medical"], result["rights"], result["risk"],
+                                   language=result.get("language", "English"))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not build the plan: {e}")
+
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_PDF_PAGES = 10
+MAX_TEXT_CHARS = 4000
+
+
+@app.post("/api/extract-text")
+async def extract_text(file: UploadFile = File(...), authorization: str | None = Header(default=None)):
+    """Reads a denial letter (PDF or .txt) and returns its text so the case box can be filled.
+    The file is processed in memory and is NOT stored."""
+    get_current_user(authorization)
+    name = (file.filename or "").lower()
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File is too large (max 5 MB).")
+    if not data:
+        raise HTTPException(status_code=400, detail="The file is empty.")
+
+    pages = 0
+    if name.endswith(".pdf"):
+        if not data.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="This does not look like a real PDF file.")
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            if reader.is_encrypted:
+                raise HTTPException(status_code=400, detail="This PDF is password-protected.")
+            pages = len(reader.pages)
+            text = "\n".join((p.extract_text() or "") for p in reader.pages[:MAX_PDF_PAGES])
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not read this PDF.")
+    elif name.endswith(".txt"):
+        text = data.decode("utf-8", errors="ignore")
+    else:
+        raise HTTPException(status_code=400, detail="Please upload a PDF or .txt file.")
+
+    text = " ".join(text.split())  # collapse whitespace / line breaks
+    if len(text) < 20:
+        raise HTTPException(status_code=422, detail="No readable text found. Scanned or photo PDFs are not supported — please type or paste the key details instead.")
+    truncated = len(text) > MAX_TEXT_CHARS
+    return {"text": text[:MAX_TEXT_CHARS], "truncated": truncated, "pages": pages}
 
 
 @app.get("/api/me")

@@ -413,6 +413,58 @@ def edit_appeal_letter(letter: str, instruction: str, case_text: str, medical: d
     return {"reply": reply or "Done — I've updated the letter.", "letter": new_letter}
 
 
+NEXT_STEPS_SYSTEM = """You write the "What to do next" plan inside CareRights AI, a healthcare
+decision-support system. You are given the user's case plus the Medical, Insurance-Rights and
+Risk-of-Waiting findings (with the source excerpts they cite).
+
+Write a short, practical action plan of 3 to 5 steps, in order, in {language}.
+
+RULES:
+- Base every step ONLY on the findings and source excerpts given. Do not add laws, deadlines,
+  time limits, amounts or authorities that are not in them. If a deadline or authority is in a
+  source excerpt, you may name it; otherwise do not invent one.
+- If the findings are "gray-area" or the sources are thin, say so in a step and make one of the
+  steps "talk to the doctor / a qualified insurance or legal professional".
+- If the risk finding says delay is dangerous, put "seek medical care / ask the doctor about
+  urgency" as the FIRST step.
+- Plain, simple words a patient can follow. No diagnosis, no legal ruling.
+- Each step: a short "title" (max 7 words) and a "detail" (1-2 sentences).
+
+Respond ONLY with strict JSON, no markdown fences, in exactly this shape:
+{{"steps": [{{"title": "...", "detail": "..."}}, ...], "note": "one short sentence reminding this is information, not advice"}}
+"""
+
+
+def generate_next_steps(case_text: str, medical: dict, rights: dict, risk: dict, language: str = "English") -> dict:
+    """On-demand (not part of the main pipeline) so it only uses API quota when the user asks."""
+    payload = (
+        f"USER CASE:\n{case_text}\n\n"
+        f"MEDICAL: {json.dumps({k: v for k, v in medical.items() if k != 'retrieved_sources'}, ensure_ascii=False)}\n"
+        f"RIGHTS: {json.dumps({k: v for k, v in rights.items() if k != 'retrieved_sources'}, ensure_ascii=False)}\n"
+        f"RISK: {json.dumps({k: v for k, v in risk.items() if k != 'retrieved_sources'}, ensure_ascii=False)}\n\n"
+        f"CITED SOURCE EXCERPTS:\n{_format_cited_sources(medical, rights, risk)}"
+    )
+    result = _parse_json(_call_claude(NEXT_STEPS_SYSTEM.format(language=language), payload, max_tokens=1500))
+    steps = [
+        {"title": str(x.get("title", "")).strip(), "detail": str(x.get("detail", "")).strip()}
+        for x in result.get("steps", []) if isinstance(x, dict) and (x.get("title") or x.get("detail"))
+    ][:5]
+    if not steps:
+        raise RuntimeError("The planner returned no steps. Please try again.")
+    return {"steps": steps, "note": str(result.get("note", "")).strip()}
+
+
+def _format_cited_sources(*findings: dict) -> str:
+    lines, seen = [], set()
+    for f in findings:
+        cited = set(f.get("cited_sources", []))
+        for s in f.get("retrieved_sources", []):
+            if s.get("chunk_id") in cited and s["chunk_id"] not in seen:
+                seen.add(s["chunk_id"])
+                lines.append(f"[Source {s['chunk_id']}] {s['topic']}: {s['content']}")
+    return "\n".join(lines) or "(no sources were cited)"
+
+
 def analyze_case(case_text: str, language: str = "English") -> dict:
     """Full pipeline: 3 agents (in parallel) -> second opinion -> debate/safety synthesis."""
     with ThreadPoolExecutor(max_workers=3) as pool:

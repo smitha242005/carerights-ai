@@ -659,9 +659,59 @@
   .chat-input-row button:disabled { opacity: 0.5; cursor: default; }
   .chat-input-row input:disabled { background: var(--paper-dim); }
 
+  /* ---- citation chips + source viewer ---- */
+  .source-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+  .source-label { font-size: 11.5px; color: var(--ink-soft); margin-right: 2px; }
+  .source-chip {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; padding: 3px 8px;
+    background: var(--paper-dim); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 3px; cursor: pointer;
+  }
+  .source-chip:hover { background: #E9E1CE; border-color: var(--ink-soft); }
+  .source-none { font-size: 11.5px; color: var(--ink-soft); font-style: italic; }
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(20,16,12,0.65); display: none;
+    align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-box {
+    background: var(--paper); color: var(--ink); max-width: 640px; width: 100%; max-height: 85vh;
+    overflow-y: auto; border-radius: 4px; padding: 28px; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6);
+  }
+  .modal-box h3 { font-family: 'Fraunces', serif; font-size: 18px; margin: 6px 0 12px; }
+  .modal-id { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-soft); }
+  .modal-text { font-size: 14px; line-height: 1.7; background: var(--paper-dim); border: 1px solid var(--line); border-radius: 3px; padding: 14px 16px; }
+  .modal-meta { font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+  .modal-close { float: right; background: none; border: 1px solid var(--line); border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 13px; color: var(--ink); }
+  .modal-close:hover { background: var(--paper-dim); }
+
+  /* ---- what to do next ---- */
+  .next-card { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 28px 32px; margin-top: 14px; }
+  .next-card h2 { font-family: 'Fraunces', serif; font-size: 18px; margin: 0 0 14px; color: var(--ink); }
+  .next-steps { list-style: none; counter-reset: step; margin: 0; padding: 0; }
+  .next-steps li { counter-increment: step; display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .next-steps li:first-child { border-top: none; }
+  .next-steps li::before {
+    content: counter(step); flex: 0 0 28px; height: 28px; border-radius: 50%; background: var(--medical);
+    color: #fff; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center;
+  }
+  .next-steps .step-title { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+  .next-steps .step-detail { font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); margin-top: 2px; }
+  .next-note { font-size: 12px; color: var(--ink-soft); margin: 12px 0 0; }
+
+  /* ---- upload ---- */
+  .upload-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .upload-btn {
+    font-family: 'Inter', sans-serif; font-size: 12.5px; font-weight: 600; padding: 7px 14px;
+    background: var(--paper); color: var(--ink); border: 1px dashed var(--ink-soft); border-radius: 3px; cursor: pointer;
+  }
+  .upload-btn:hover { background: var(--paper-dim); }
+  .upload-hint { font-size: 12px; color: var(--ink-soft); }
+  .upload-hint.err { color: var(--alert); }
+
   @media print {
     body { background: white !important; color: black !important; }
-    .topbar, .no-print, .results-toolbar, .back-link, .feedback-row, .letter-chat, .letter-actions { display: none !important; }
+    .topbar, .no-print, .results-toolbar, .back-link, .feedback-row, .letter-chat, .letter-actions, .modal-backdrop { display: none !important; }
     .agent-card, .debate-card, .safety-block, .letter-card { box-shadow: none !important; border: 1px solid #ccc !important; }
     .case-context, .case-context span { color: black !important; }
   }
@@ -894,6 +944,11 @@
           <span class="example-chip" data-ex="My doctor wants me to get an MRI for persistent headaches, but my insurer says it's not medically necessary and wants me to try cheaper options first.">MRI necessity dispute</span>
           <span class="example-chip" data-ex="I am having severe chest pain and shortness of breath, and my insurer is asking for prior authorization before covering an ER visit.">Urgent chest pain case</span>
         </div>
+        <div class="upload-row">
+          <input type="file" id="denialFile" accept=".pdf,.txt,application/pdf,text/plain" style="display:none;">
+          <button type="button" class="upload-btn" id="uploadBtn">&#128206; Upload denial letter (PDF or .txt)</button>
+          <span class="upload-hint" id="uploadHint">The text fills the box above. Files are read in memory and not saved. You may delete your name or policy number before analyzing.</span>
+        </div>
         <div style="margin-top:20px;">
           <label for="languageSelect">Answer in</label>
           <select id="languageSelect" style="width:auto; min-width:180px; padding:10px 14px; font-family:'Inter',sans-serif; font-size:14px; border:1.5px solid var(--line); border-radius:3px; background:#FFFFFF; color:var(--ink);">
@@ -929,6 +984,7 @@
           <button class="toolbar-btn" id="speakBtn" title="Read results aloud">&#128266; Listen</button>
           <button class="toolbar-btn" id="downloadPdfBtn" title="Save as PDF">&#128190; Save PDF</button>
           <button class="toolbar-btn" id="addReminderBtn" title="Add appeal deadline to calendar">&#128197; Remind me</button>
+          <button class="toolbar-btn" id="nextStepsBtn" title="A short action plan based on these findings">&#129517; What to do next</button>
           <button class="toolbar-btn" id="appealLetterBtn" title="Generate a ready-to-send appeal letter">&#128220; Generate Appeal Letter</button>
         </div>
       </div>
@@ -941,12 +997,23 @@
         </div>
       </div>
       <div id="resultsBody"></div>
+      <div id="nextStepsContainer" style="display:none;"></div>
       <div id="appealLetterContainer" style="display:none; margin-top:14px;"></div>
       <div style="margin-top:24px;" class="no-print">
         <button class="new-case-btn" id="analyzeAnotherBtn">+ Analyze another case</button>
       </div>
     </div>
 
+  </div>
+</div>
+
+<div class="modal-backdrop no-print" id="sourceModal">
+  <div class="modal-box">
+    <button class="modal-close" id="sourceModalClose">Close &#10005;</button>
+    <div class="modal-id" id="sourceModalId"></div>
+    <h3 id="sourceModalTopic"></h3>
+    <div class="modal-text" id="sourceModalText"></div>
+    <div class="modal-meta" id="sourceModalMeta"></div>
   </div>
 </div>
 
@@ -1290,6 +1357,8 @@ function showResultsFor(record) {
   const appealContainer = document.getElementById('appealLetterContainer');
   appealContainer.style.display = 'none';
   appealContainer.innerHTML = '';
+  const nsContainer = document.getElementById('nextStepsContainer');
+  nsContainer.style.display = 'none'; nsContainer.innerHTML = '';
   const priorityRow = document.getElementById('priorityRow');
   priorityRow.style.display = record.result.debate.high_risk ? 'none' : 'flex';
   document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
@@ -1307,37 +1376,40 @@ function showResultsFor(record) {
       <div class="debate-card" style="margin-top:14px;">
         <span class="${second_opinion.agrees_with_medical_agent ? 'agree-tag' : 'conflict-tag'}">${second_opinion.agrees_with_medical_agent ? 'Second opinion agrees' : 'Second opinion challenges this'}</span>
         <h2>Second opinion on the Medical finding</h2>
-        <p class="debate-text">${second_opinion.challenge}</p>
+        <p class="debate-text">${escapeHtml(second_opinion.challenge)}</p>
       </div>` : '';
 
     body.innerHTML = `
       <div class="agent-grid">
         <div class="agent-card medical">
           <div class="agent-label"><span class="dot"></span>Medical Evidence Agent</div>
-          <div class="agent-finding">${medical.finding}</div>
-          <div class="agent-reasoning">${medical.reasoning}</div>
+          <div class="agent-finding">${escapeHtml(medical.finding)}</div>
+          <div class="agent-reasoning">${escapeHtml(medical.reasoning)}</div>
           <span class="confidence-badge ${confClass(medical.confidence)}">${confLabel(medical.confidence)}</span>
+          ${sourcesRowHtml(medical, 'medical')}
           ${feedbackRowHtml(record.id, 'medical')}
         </div>
         <div class="agent-card rights">
           <div class="agent-label"><span class="dot"></span>Cost / Insurance Rights Agent</div>
-          <div class="agent-finding">${rights.finding}</div>
-          <div class="agent-reasoning">${rights.reasoning}</div>
+          <div class="agent-finding">${escapeHtml(rights.finding)}</div>
+          <div class="agent-reasoning">${escapeHtml(rights.reasoning)}</div>
           <span class="confidence-badge ${confClass(rights.confidence)}">${confLabel(rights.confidence)}</span>
+          ${sourcesRowHtml(rights, 'rights')}
           ${feedbackRowHtml(record.id, 'rights')}
         </div>
         <div class="agent-card risk">
           <div class="agent-label"><span class="dot"></span>Risk-of-Waiting Agent</div>
-          <div class="agent-finding">${risk.finding}</div>
-          <div class="agent-reasoning">${risk.reasoning}</div>
+          <div class="agent-finding">${escapeHtml(risk.finding)}</div>
+          <div class="agent-reasoning">${escapeHtml(risk.reasoning)}</div>
           <span class="confidence-badge ${confClass(risk.confidence)}">${confLabel(risk.confidence)}</span>
+          ${sourcesRowHtml(risk, 'risk')}
           ${feedbackRowHtml(record.id, 'risk')}
         </div>
       </div>
       <div class="debate-card">
         <span class="${debate.agreement === 'agree' ? 'agree-tag' : 'conflict-tag'}">${debate.agreement === 'agree' ? 'Agents agree' : 'Agents disagree'}</span>
         <h2>Debate &amp; comparison</h2>
-        <p class="debate-text">${debate.summary}</p>
+        <p class="debate-text">${escapeHtml(debate.summary)}</p>
       </div>
       ${secondOpinionHtml}
     `;
@@ -1579,6 +1651,119 @@ function wireLetterChat() {
     URL.revokeObjectURL(url);
   });
 }
+
+
+// ============ citation chips + source viewer ============
+function sourcesRowHtml(agentResult, agentKey) {
+  const cited = (agentResult && agentResult.cited_sources) || [];
+  if (!cited.length) {
+    return '<div class="source-row"><span class="source-label">Sources:</span><span class="source-none">none cited (not covered by available sources)</span></div>';
+  }
+  const chips = cited.map(id =>
+    `<button class="source-chip" data-agent="${agentKey}" data-chunk="${escapeHtml(id)}" title="Read the source passage">${escapeHtml(id)}</button>`).join('');
+  return `<div class="source-row"><span class="source-label">Sources (click to read):</span>${chips}</div>`;
+}
+
+function openSourceModal(agentKey, chunkId) {
+  const record = caseHistory.find(c => c.id === activeCaseId);
+  const agentResult = record && record.result[agentKey];
+  const src = agentResult && (agentResult.retrieved_sources || []).find(x => x.chunk_id === chunkId);
+  document.getElementById('sourceModalId').textContent = chunkId;
+  if (src) {
+    document.getElementById('sourceModalTopic').textContent = src.topic;
+    document.getElementById('sourceModalText').textContent = src.content;
+    const parts = [];
+    if (src.source_file) parts.push('From: ' + src.source_file);
+    if (typeof src.relevance_score === 'number') parts.push('Retrieval relevance score: ' + src.relevance_score + ' (cosine similarity)');
+    document.getElementById('sourceModalMeta').textContent = parts.join('  ·  ');
+  } else {
+    document.getElementById('sourceModalTopic').textContent = 'Source text not available';
+    document.getElementById('sourceModalText').textContent = 'The passage for this source was not saved with this case.';
+    document.getElementById('sourceModalMeta').textContent = '';
+  }
+  document.getElementById('sourceModal').classList.add('open');
+}
+function closeSourceModal() { document.getElementById('sourceModal').classList.remove('open'); }
+
+document.getElementById('resultsBody').addEventListener('click', e => {
+  const chip = e.target.closest('.source-chip');
+  if (chip) openSourceModal(chip.dataset.agent, chip.dataset.chunk);
+});
+document.getElementById('sourceModalClose').addEventListener('click', closeSourceModal);
+document.getElementById('sourceModal').addEventListener('click', e => { if (e.target.id === 'sourceModal') closeSourceModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSourceModal(); });
+
+// ============ "What to do next" ============
+const nextStepsCache = {};   // caseId -> plan, so a second click costs no API call
+
+function renderNextSteps(plan) {
+  const container = document.getElementById('nextStepsContainer');
+  const items = plan.steps.map(s => `
+    <li><div><div class="step-title">${escapeHtml(s.title)}</div><div class="step-detail">${escapeHtml(s.detail)}</div></div></li>`).join('');
+  container.innerHTML = `
+    <div class="next-card">
+      <h2>&#129517; What to do next</h2>
+      <ol class="next-steps">${items}</ol>
+      ${plan.note ? `<p class="next-note">${escapeHtml(plan.note)}</p>` : ''}
+      <p class="next-note">Built only from the findings and sources above. Not medical or legal advice.</p>
+    </div>`;
+  container.style.display = 'block';
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('nextStepsBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('nextStepsBtn');
+  const record = caseHistory.find(c => c.id === activeCaseId);
+  if (!record) return;
+  if (record.result.debate.high_risk) {
+    alert('A plan is not available for safety-blocked cases — please seek real medical help first.');
+    return;
+  }
+  if (nextStepsCache[activeCaseId]) { renderNextSteps(nextStepsCache[activeCaseId]); return; }
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.textContent = 'Building plan...';
+  try {
+    const res = await fetch(API_BASE + '/api/cases/' + activeCaseId + '/next-steps', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('Server error ' + res.status));
+    nextStepsCache[activeCaseId] = data;
+    renderNextSteps(data);
+  } catch (err) {
+    alert('Could not build the plan (' + err.message + '). Please try again.');
+  } finally {
+    btn.disabled = false; btn.innerHTML = original;
+  }
+});
+
+// ============ upload denial letter -> fills the case box ============
+document.getElementById('uploadBtn').addEventListener('click', () => document.getElementById('denialFile').click());
+document.getElementById('denialFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const hint = document.getElementById('uploadHint');
+  const btn = document.getElementById('uploadBtn');
+  if (!file) return;
+  hint.classList.remove('err');
+  if (file.size > 5 * 1024 * 1024) { hint.textContent = 'File is too large (max 5 MB).'; hint.classList.add('err'); e.target.value = ''; return; }
+  btn.disabled = true; hint.textContent = 'Reading ' + file.name + '...';
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(API_BASE + '/api/extract-text', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken }, body: form
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('Server error ' + res.status));
+    caseInput.value = caseInput.value.trim() ? caseInput.value.trim() + '\n\n' + data.text : data.text;
+    hint.textContent = 'Added the text from ' + file.name + (data.truncated ? ' (long letter — only the first part was used)' : '') + '. Check it, remove personal details if you like, then click Analyze.';
+  } catch (err) {
+    hint.textContent = err.message; hint.classList.add('err');
+  } finally {
+    btn.disabled = false; e.target.value = '';
+  }
+});
 
 // ============ priority weighting (re-emphasizes existing results, no new AI call) ============
 document.querySelectorAll('.priority-btn').forEach(btn => {
